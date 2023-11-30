@@ -10,7 +10,6 @@ soup = BeautifulSoup(r.content, "html.parser")
 
 # Fonction qui recupere les infos d'un livre et le stocke dans un dictionnaire
 def get_book_info(soup):
-
     # Isoler les données qui nous interessent
     product_info = soup.find_all('td')
     UPC = product_info[0].text
@@ -24,7 +23,6 @@ def get_book_info(soup):
     category = nav[3].text
     stars = soup.find('p', class_='star-rating')
     review_rating = stars['class'][1]
-
     # Les infos d'un livre
     book_infos = {'product_page_url': url,
               'universal_ product_code (upc)': UPC,
@@ -38,7 +36,6 @@ def get_book_info(soup):
               'image_url': image_url
               }
     return book_infos
-
 # Fonction qui charge les données en csv
 def load_data(book_infos, bts):
     fieldnames = book_infos.keys() # Les clés du dictionnaire deviennent les en-tete
@@ -47,7 +44,17 @@ def load_data(book_infos, bts):
         writer.writeheader() # Ecriture des en-tete
         writer.writerow(book_infos) # Ecriture des datas
 
-chemin = "/Users/guwoop/Documents/books_to_scrape/bts.csv"
 
+def get_all_books_page(soup):
+    page = "http://books.toscrape.com/catalogue/category/books/travel_2/index.html"
+# Trouver toutes les balises <a> contenues dans <h3> avec un attribut href
+    urls_cut = soup.select('h3 a[href]')
+# Nettoyage et création des URL de chaque livre de la catégorie
+    for url_cut in urls_cut:
+        books_urls = print(f"http://books.toscrape.com/catalogue/{url_cut['href'].strip('../../..')}")
+
+
+chemin = "/Users/guwoop/Documents/books_to_scrape/bts.csv"
+get_all_books_page(soup)
 book_infos = get_book_info(soup)
 load_data(book_infos, chemin)
