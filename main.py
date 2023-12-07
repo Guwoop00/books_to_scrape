@@ -1,89 +1,125 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
+import shutil
 
-def get_all_category():
+#Extraction des URL Catégory
+def get_all_category_urls():
     category_urls = []
     home_url = "http://books.toscrape.com/index.html"
-    r = requests.get(home_url)
-    soup = BeautifulSoup(r.content, "html.parser")
-    ul_s = soup.find_all('ul')
-    for ul in ul_s:
-        li_s = ul.find_all('li')
-        for li in li_s:
+    response = requests.get(home_url)
+    soup = BeautifulSoup(response.content, "html.parser")
+
+    for ul in soup.find_all('ul'):
+        for li in ul.find_all('li'):
             a_tag = li.find('a')
             if a_tag:
-                link = f"http://books.toscrape.com/{li.find('a')['href']}"
-                print(link)
+                link = f"http://books.toscrape.com/{a_tag['href']}" #Reconstruction du lien complet
                 if link not in category_urls:
                     category_urls.append(link)
-                else:
-                    continue
-    del(category_urls[0:2])
-    del(category_urls[-1])
+
+    #Suppression des liens inutiles
+    del category_urls[0:2]
+    del category_urls[-1]
     return category_urls
 
-def get_all_books(category_url):
-    book_list = []
-    r = requests.get(category_url)
-    soup = BeautifulSoup(r.content, "html.parser")
-    urls_cut = soup.find_all('h3')
-    for url in urls_cut:
-        link = f"http://books.toscrape.com/catalogue/{url.find('a')['href'].strip('../../..')}"
-        book_list.append(link)
-    return book_list
+#Extraction des URL Catégory des pages "Next"
+def get_page_urls(category_url):
+    response = requests.get(category_url)
+    soup = BeautifulSoup(response.content, "html.parser")
+    next_page = soup.find('li', class_='current')
 
+    if next_page:
+        page_number = int(next_page.get_text(strip=True)[-1])#Si il y a "next page" et combien
+        base_url = category_url.rsplit('/', 1)[0]
+
+        page_urls = [f"{base_url}/page-{i}.html" for i in range(1, page_number + 1)]#Reconstitution du lien complet
+        return page_urls
+
+    return [category_url]
+
+#Extraction des URL Book
+def get_all_books_urls(page_url):
+    book_urls = []
+    response = requests.get(page_url)
+    soup = BeautifulSoup(response.content, "html.parser")
+    urls_cut = soup.find_all('h3')
+
+    for url in urls_cut:
+        link = f"http://books.toscrape.com/catalogue/{url.find('a')['href'].strip('../../..')}"#Reconstitution du lien complet
+        if link not in book_urls:
+            book_urls.append(link)
+
+    return book_urls
+
+#Extraction de Book Infos
 def get_book_info(link):
-    # Extract
-    r = requests.get(link)
-    soup = BeautifulSoup(r.content, "html.parser")
+    response = requests.get(link)
+    soup = BeautifulSoup(response.content, "html.parser")
     product_info = soup.find_all('td')
     UPC = product_info[0].text
     price_including_tax = product_info[2].text
     price_excluding_tax = product_info[3].text
     number_available = product_info[5].text
     title = soup.find('h1').text
-    product_description = soup.find('meta', {'name': 'description'})['content']
     image_url = soup.find('img')['src']
+    dl_img_link = f"http://books.toscrape.com/{image_url.strip('../../..')}"
     nav = soup.find_all('a')
     category = nav[3].text
     stars = soup.find('p', class_='star-rating')
     review_rating = stars['class'][1]
+    #Exception car certain n'ont pas de description
+    try:
+        product_description = soup.find('p', class_=False).text
+    except (AttributeError, TypeError):
+        product_description = None
 
-    # Les infos d'un livre
-    book_infos = {
+#Données Book
+#Keys: Raw
+    book_info = {
+        'title': title,
         'product_page_url': link,
         'universal_product_code (upc)': UPC,
-        'title': title,
         'price_including_tax': price_including_tax,
         'price_excluding_tax': price_excluding_tax,
         'number_available': number_available,
         'product_description': product_description,
         'category': category,
         'review_rating': review_rating,
-        'image_url': image_url
+        'image_url': dl_img_link
     }
-    return book_infos
+    try:
+        response = requests.get(dl_img_link, stream=True)
+        print(response)
+        with open(f'{title}.png', 'wb') as out_file:
+            shutil.copyfileobj(response.raw, out_file)
+        del response
+        
 
-def load_data(book_infos, category, bts):
+    return book_info
+
+#Ecriture en données CSV
+def write_to_csv(book_infos, category, filename='books_data.csv'):
     fieldnames = book_infos[0].keys()
-    with open(f'{category}_{bts}', mode='w', newline='', encoding='utf-8') as csvfile:
+    category_filename = f'{category}_{filename}'
+
+    with open(category_filename, mode='a', newline='', encoding='utf-8') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames)
         writer.writeheader()
         writer.writerows(book_infos)
 
-# Variables
-all_category_urls = get_all_category()
+# Appel des fonctions
+all_category_urls = get_all_category_urls()
 
-# Lancement
 for category_url in all_category_urls:
-    book_list = get_all_books(category_url)
-    all_books_info = []
+    page_urls = get_page_urls(category_url)
 
-    for book_link in book_list:
-        book_info = get_book_info(book_link)
-        all_books_info.append(book_info)
+    for page_url in page_urls:
+        book_urls = get_all_books_urls(page_url)
+        all_books_info = []
 
-    load_data(all_books_info, category_url.split('/')[-3], 'books_data.csv')
+        for book_url in book_urls:
+            book_info = get_book_info(book_url)
+            all_books_info.append(book_info)
 
-print("All categories processed.")
+        write_to_csv(all_books_info, category_url.split('/')[-3])
