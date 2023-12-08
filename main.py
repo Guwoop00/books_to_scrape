@@ -1,7 +1,8 @@
 import requests
 from bs4 import BeautifulSoup
 import csv
-import shutil
+import os
+import urllib.request
 
 #Extraction des URL Catégory
 def get_all_category_urls():
@@ -21,6 +22,7 @@ def get_all_category_urls():
     #Suppression des liens inutiles
     del category_urls[0:2]
     del category_urls[-1]
+
     return category_urls
 
 #Extraction des URL Catégory des pages "Next"
@@ -52,8 +54,14 @@ def get_all_books_urls(page_url):
 
     return book_urls
 
+def download_img(dl_img_link, title, category):
+    print(f"{dl_img_link=} ")
+    print(f"{title=}")
+    print(f"{category=}")
+    urllib.request.urlretrieve(dl_img_link, f"img/{category}/{title}.png")
+
 #Extraction de Book Infos
-def get_book_info(link):
+def get_book_info(link, category_folder):
     response = requests.get(link)
     soup = BeautifulSoup(response.content, "html.parser")
     product_info = soup.find_all('td')
@@ -88,38 +96,37 @@ def get_book_info(link):
         'review_rating': review_rating,
         'image_url': dl_img_link
     }
-    try:
-        response = requests.get(dl_img_link, stream=True)
-        print(response)
-        with open(f'{title}.png', 'wb') as out_file:
-            shutil.copyfileobj(response.raw, out_file)
-        del response
-        
-
+    title = title.replace("/", " ")# Probleme lors de l'ecriture des images lié au nom
+    download_img(dl_img_link, title, category_folder)# Appel de la fonction image
+ 
     return book_info
 
 #Ecriture en données CSV
-def write_to_csv(book_infos, category, filename='books_data.csv'):
+def write_to_csv(book_infos, category):
     fieldnames = book_infos[0].keys()
-    category_filename = f'{category}_{filename}'
+    category_filename = f'img/{category}/data.csv'
 
     with open(category_filename, mode='a', newline='', encoding='utf-8') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames)
+        writer = csv.DictWriter(csvfile, fieldnames, delimiter=";")
         writer.writeheader()
         writer.writerows(book_infos)
 
 # Appel des fonctions
 all_category_urls = get_all_category_urls()
-
+os.mkdir("img")
 for category_url in all_category_urls:
     page_urls = get_page_urls(category_url)
+    category = category_url.split('/')[-2] 
+    
+    os.mkdir(f"img/{category}")
 
     for page_url in page_urls:
         book_urls = get_all_books_urls(page_url)
         all_books_info = []
 
         for book_url in book_urls:
-            book_info = get_book_info(book_url)
+            book_info = get_book_info(book_url, category)
             all_books_info.append(book_info)
+    
 
-        write_to_csv(all_books_info, category_url.split('/')[-3])
+    write_to_csv(all_books_info, category)
