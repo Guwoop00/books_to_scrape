@@ -30,6 +30,6 @@ python3 main.py
 ```
 
 Plusieurs dossiers « catégories » seront créés.
-A l'interieur de ceux ci un dossier "datas" contiendra toutes images des livres aisin qu'un fichier csv
+A l'interieur de ceux ci un dossier "data" contiendra toutes images des livres aisin qu'un fichier csv
 
 
