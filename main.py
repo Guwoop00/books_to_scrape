@@ -58,7 +58,7 @@ def download_img(dl_img_link, title, category):
     print(f"{dl_img_link=} ")
     print(f"{title=}")
     print(f"{category=}")
-    urllib.request.urlretrieve(dl_img_link, f"img/{category}/{title}.png")
+    urllib.request.urlretrieve(dl_img_link, f"datas/{category}/{title}.png")
 
 #Extraction de Book Infos
 def get_book_info(link, category_folder):
@@ -104,7 +104,7 @@ def get_book_info(link, category_folder):
 #Ecriture en données CSV
 def write_to_csv(book_infos, category):
     fieldnames = book_infos[0].keys()
-    category_filename = f'img/{category}/data.csv'
+    category_filename = f'datas/{category}/data.csv'
 
     with open(category_filename, mode='a', newline='', encoding='utf-8') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames, delimiter=";")
@@ -113,12 +113,12 @@ def write_to_csv(book_infos, category):
 
 # Appel des fonctions
 all_category_urls = get_all_category_urls()
-os.mkdir("img")
+os.mkdir("datas")
 for category_url in all_category_urls:
     page_urls = get_page_urls(category_url)
     category = category_url.split('/')[-2] 
     
-    os.mkdir(f"img/{category}")
+    os.mkdir(f"datas/{category}")
 
     for page_url in page_urls:
         book_urls = get_all_books_urls(page_url)
